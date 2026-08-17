@@ -6,6 +6,9 @@
   "observability": {
     "enabled": true
   },
+  "assets": {
+    "directory": "./assets"
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -15,6 +18,7 @@
   ],
   "vars": {
     "WEEKLY_START_STARS": "30",
-    "LONG_TERM_GOAL": "1000"
+    "LONG_TERM_GOAL": "1000",
+    "SHOP_BANNER_URL": "https://telegram-kids-game-bot.atubu2000.workers.dev/shop-banner.png"
   }
 }
