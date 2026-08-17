@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "telegram-kids-game-bot",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-17",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kids_game_bot",
+      "database_id": "a11e48c4-e796-4946-aef4-bb8ef041902f"
+    }
+  ],
+  "vars": {
+    "WEEKLY_START_STARS": "30",
+    "LONG_TERM_GOAL": "1000"
+  }
+}
