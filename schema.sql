@@ -76,14 +76,19 @@ VALUES
   (1, 'player1', '👦 Игрок 1', 30, 0, 0, 0),
   (2, 'player2', '👦 Игрок 2', 30, 0, 0, 0);
 
-INSERT OR IGNORE INTO shop_items (id, name, emoji, price, active)
+INSERT INTO shop_items (id, name, emoji, price, active)
 VALUES
-  (1, 'Сладость', '🍫', 15, 1),
-  (2, 'Доп. время телефона', '📱', 25, 1),
-  (3, 'Доп. игровое время', '🎮', 30, 1),
-  (4, 'Выбрать семейное развлечение', '🎬', 40, 1),
-  (5, 'Досуг с родителями', '👨‍👩‍👦', 50, 1),
-  (6, 'Небольшая покупка', '🎁', 70, 1);
+  (1, 'Телефон · 1 час', '📱', 10, 1),
+  (2, 'Сладости на 20 крон', '🍬', 80, 1),
+  (3, '50 крон', '💵', 150, 1),
+  (4, 'Напиток · 0.5 л', '🥤', 40, 1),
+  (5, 'Булочка', '🍩', 40, 1),
+  (6, 'Телевизор · 1 час', '📺', 10, 1)
+ON CONFLICT(id) DO UPDATE SET
+  name = excluded.name,
+  emoji = excluded.emoji,
+  price = excluded.price,
+  active = excluded.active;
 
 INSERT OR IGNORE INTO bot_state (key, value)
 VALUES ('last_weekly_reset_key', '');
