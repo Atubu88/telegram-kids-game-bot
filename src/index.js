@@ -1,3 +1,6 @@
+const DEFAULT_SHOP_BANNER_URL =
+  'https://raw.githubusercontent.com/Atubu88/telegram-kids-game-bot/main/assets/shop-banner.png';
+
 export default {
   async fetch(request, env) {
     try {
@@ -289,7 +292,7 @@ async function applyRemoveWithOptionalLock(chatId, player, lockShop, env) {
   const updated = await getPlayerByCode(player.code, env);
   await sendMessage(
     chatId,
-    `✅ Снято ${Math.abs(delta)} ⭐️\nПричина: ${reason}${lockShop ? '\nМагазин: закрыт 🔒' : '\nМагазин: без изменений'}\n\n${formatPlayerSummary(updated)}` ,
+    `✅ Снято ${Math.abs(delta)} ⭐️\nПричина: ${reason}${lockShop ? '\nМагазин: закрыт 🔒' : '\nМагазин: без изменений'}\n\n${formatPlayerSummary(updated)}`,
     playerMenuKeyboard(player.code),
     env
   );
@@ -417,6 +420,7 @@ async function sendShopOverview(chatId, env) {
     lines.push(`• ${item.emoji} ${item.name} — ${item.price} ⭐️`);
   }
 
+  await sendShopBanner(chatId, env);
   await sendMessage(chatId, lines.join('\n'), mainMenuKeyboard(), env);
 }
 
@@ -443,6 +447,7 @@ async function sendPlayerShop(chatId, player, env) {
   ]);
   keyboardRows.push([{ text: '⬅️ Назад', callback_data: `player:${player.code}` }]);
 
+  await sendShopBanner(chatId, env);
   await sendMessage(chatId, lines.join('\n'), inlineKeyboard(keyboardRows), env);
 }
 
@@ -512,6 +517,23 @@ function playerMenuKeyboard(code) {
 
 function inlineKeyboard(rows) {
   return { inline_keyboard: rows };
+}
+
+async function sendShopBanner(chatId, env) {
+  const bannerUrl = env.SHOP_BANNER_URL || DEFAULT_SHOP_BANNER_URL;
+
+  try {
+    await telegram(
+      'sendPhoto',
+      {
+        chat_id: chatId,
+        photo: bannerUrl,
+      },
+      env
+    );
+  } catch (error) {
+    console.error('shop banner error', error);
+  }
 }
 
 async function sendMessage(chatId, text, replyMarkup, env) {
