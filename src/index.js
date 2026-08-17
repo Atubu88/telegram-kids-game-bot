@@ -407,7 +407,6 @@ async function sendGlobalHistory(chatId, env) {
 }
 
 async function sendShopOverview(chatId, env) {
-  const items = await listShopItems(env);
   const players = await listPlayers(env);
   const lines = ['🎁 Общий магазин', ''];
 
@@ -415,13 +414,7 @@ async function sendShopOverview(chatId, env) {
     lines.push(`${player.name}: ${player.shop_locked ? '🔒 закрыт' : '🔓 открыт'} · ${player.weekly_stars} ⭐️`);
   }
 
-  lines.push('', 'Товары:');
-  for (const item of items) {
-    lines.push(`• ${item.emoji} ${item.name} — ${item.price} ⭐️`);
-  }
-
-  await sendShopBanner(chatId, env);
-  await sendMessage(chatId, lines.join('\n'), mainMenuKeyboard(), env);
+  await sendShopBanner(chatId, lines.join('\n'), mainMenuKeyboard(), env);
 }
 
 async function sendPlayerShop(chatId, player, env) {
@@ -430,13 +423,7 @@ async function sendPlayerShop(chatId, player, env) {
     `🎁 Магазин для ${player.name}`,
     player.shop_locked ? 'Статус: 🔒 закрыт' : 'Статус: 🔓 открыт',
     `Баланс: ${player.weekly_stars} ⭐️`,
-    '',
-    'Товары:',
   ];
-
-  for (const item of items) {
-    lines.push(`• ${item.emoji} ${item.name} — ${item.price} ⭐️`);
-  }
 
   const keyboardRows = [];
   for (const item of items) {
@@ -447,8 +434,7 @@ async function sendPlayerShop(chatId, player, env) {
   ]);
   keyboardRows.push([{ text: '⬅️ Назад', callback_data: `player:${player.code}` }]);
 
-  await sendShopBanner(chatId, env);
-  await sendMessage(chatId, lines.join('\n'), inlineKeyboard(keyboardRows), env);
+  await sendShopBanner(chatId, lines.join('\n'), inlineKeyboard(keyboardRows), env);
 }
 
 function formatPlayerSummary(player) {
@@ -519,7 +505,7 @@ function inlineKeyboard(rows) {
   return { inline_keyboard: rows };
 }
 
-async function sendShopBanner(chatId, env) {
+async function sendShopBanner(chatId, caption, replyMarkup, env) {
   const bannerUrl = env.SHOP_BANNER_URL || DEFAULT_SHOP_BANNER_URL;
 
   try {
@@ -528,11 +514,14 @@ async function sendShopBanner(chatId, env) {
       {
         chat_id: chatId,
         photo: bannerUrl,
+        caption,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       },
       env
     );
   } catch (error) {
     console.error('shop banner error', error);
+    await sendMessage(chatId, caption, replyMarkup, env);
   }
 }
 
