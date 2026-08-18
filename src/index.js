@@ -1,6 +1,8 @@
 const DEFAULT_SHOP_BANNER_URL =
   'https://raw.githubusercontent.com/Atubu88/telegram-kids-game-bot/main/assets/shop-banner.png';
 
+const ALLOWED_USER_IDS = new Set(['732402669', '787107457']);
+
 export default {
   async fetch(request, env) {
     try {
@@ -43,9 +45,19 @@ function json(data, status = 200) {
 async function handleTelegramUpdate(update, env) {
   const message = update.message;
   const callbackQuery = update.callback_query;
+  const userId = callbackQuery?.from?.id ?? message?.from?.id;
+  const chatId = callbackQuery?.message?.chat?.id ?? message?.chat?.id;
+
+  if (!ALLOWED_USER_IDS.has(String(userId))) {
+    if (callbackQuery?.id) {
+      await answerCallbackQuery(callbackQuery.id, env, '⛔ Доступ запрещён', true);
+    } else if (chatId) {
+      await sendMessage(chatId, '⛔ Доступ запрещён.', undefined, env);
+    }
+    return;
+  }
 
   if (callbackQuery) {
-    const chatId = callbackQuery.message?.chat?.id;
     if (!chatId) return;
 
     await answerCallbackQuery(callbackQuery.id, env);
@@ -59,7 +71,6 @@ async function handleTelegramUpdate(update, env) {
 
   if (!message?.chat?.id || !message.text) return;
 
-  const chatId = message.chat.id;
   const text = message.text.trim();
 
   if (text === '/start') {
@@ -116,7 +127,27 @@ async function routeAction({ chatId, data, env }) {
 
   if (data.startsWith('shop_buy:')) {
     const [, code, itemIdRaw] = data.split(':');
-    await handlePurchase(chatId, code, Number(itemIdRaw), env);
+    await requestPurchaseConfirmation(chatId, code, Number(itemIdRaw), env);
+    return;
+  }
+
+  if (data.startsWith('shop_confirm:')) {
+    const [, code, itemIdRaw] = data.split(':');
+    await confirmPurchase(chatId, code, Number(itemIdRaw), env);
+    return;
+  }
+
+  if (data.startsWith('shop_cancel:')) {
+    const [, code] = data.split(':');
+    await clearSession(chatId, env);
+
+    const player = await getPlayerByCode(code, env);
+    if (!player) {
+      await sendMessage(chatId, 'Игрок не найден', undefined, env);
+      return;
+    }
+
+    await sendPlayerShop(chatId, player, env);
     return;
   }
 }
@@ -296,6 +327,73 @@ async function applyRemoveWithOptionalLock(chatId, player, lockShop, env) {
     playerMenuKeyboard(player.code),
     env
   );
+}
+
+async function requestPurchaseConfirmation(chatId, code, itemId, env) {
+  const player = await getPlayerByCode(code, env);
+  if (!player) {
+    await sendMessage(chatId, 'Игрок не найден', undefined, env);
+    return;
+  }
+
+  if (player.shop_locked) {
+    await sendMessage(chatId, `${player.name}: магазин сейчас закрыт 🔒`, playerMenuKeyboard(code), env);
+    return;
+  }
+
+  const item = await env.DB.prepare(`SELECT * FROM shop_items WHERE id = ? AND active = 1`).bind(itemId).first();
+  if (!item) {
+    await sendMessage(chatId, 'Товар не найден', playerMenuKeyboard(code), env);
+    return;
+  }
+
+  if (player.weekly_stars < item.price) {
+    await sendMessage(chatId, `${player.name}: не хватает ⭐️ для покупки ${item.emoji} ${item.name}`, playerMenuKeyboard(code), env);
+    return;
+  }
+
+  await setSession(chatId, 'await_purchase_confirm', {
+    playerCode: code,
+    itemId: item.id,
+  }, env);
+
+  await sendMessage(
+    chatId,
+    `Купить ${item.emoji} ${item.name} за ${item.price} ⭐️?`,
+    inlineKeyboard([
+      [
+        { text: '✅ Купить', callback_data: `shop_confirm:${code}:${item.id}` },
+        { text: '❌ Отмена', callback_data: `shop_cancel:${code}` },
+      ],
+    ]),
+    env
+  );
+}
+
+async function confirmPurchase(chatId, code, itemId, env) {
+  const expectedPayload = JSON.stringify({
+    playerCode: code,
+    itemId,
+  });
+
+  const consumed = await env.DB.prepare(
+    `DELETE FROM parent_sessions
+     WHERE chat_id = ?
+       AND state = 'await_purchase_confirm'
+       AND payload_json = ?`
+  ).bind(String(chatId), expectedPayload).run();
+
+  if (Number(consumed.meta?.changes || 0) !== 1) {
+    await sendMessage(
+      chatId,
+      'Это подтверждение уже неактивно. Открой магазин и выбери товар ещё раз.',
+      playerMenuKeyboard(code),
+      env
+    );
+    return;
+  }
+
+  await handlePurchase(chatId, code, itemId, env);
 }
 
 async function handlePurchase(chatId, code, itemId, env) {
@@ -537,11 +635,12 @@ async function sendMessage(chatId, text, replyMarkup, env) {
   );
 }
 
-async function answerCallbackQuery(callbackQueryId, env) {
+async function answerCallbackQuery(callbackQueryId, env, text, showAlert = false) {
   return telegram(
     'answerCallbackQuery',
     {
       callback_query_id: callbackQueryId,
+      ...(text ? { text, show_alert: showAlert } : {}),
     },
     env
   );
